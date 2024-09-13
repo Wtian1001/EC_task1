@@ -16,22 +16,24 @@ def simulation(env,x):
 def evaluate(env, x):
     return np.array(list(map(lambda y: simulation(env,y), x)))
 
+class Specialist():
+    def __init__(self, n_hidden_neurons=10,
+                 experiment_name = 'optimization_test_arco',
+                 upperbound = 1,
+                 lowerbound = -1,
+                 population_size = 100,
+                 ) -> None:
+        self.headless = True
+        if self.headless:
+            os.environ["SDL_VIDEODRIVER"] = "dummy"
 
-def main():
-    # choose this for not using visuals and thus making experiments faster
-    headless = True
-    if headless:
-        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        self.experiment_name = experiment_name
+        if not os.path.exists(self.experiment_name):
+            os.makedirs(self.experiment_name)
 
+        self.n_hidden_neurons = n_hidden_neurons
 
-    experiment_name = 'optimization_test_arco'
-    if not os.path.exists(experiment_name):
-        os.makedirs(experiment_name)
-
-    n_hidden_neurons = 10
-
-    # initializes simulation in individual evolution mode, for single static enemy.
-    env = Environment(experiment_name=experiment_name,
+        self.env = Environment(experiment_name=experiment_name,
                     enemies=[2],
                     playermode="ai",
                     player_controller=player_controller(n_hidden_neurons), # you  can insert your own controller here
@@ -39,15 +41,29 @@ def main():
                     level=2,
                     speed="fastest",
                     visuals=False)
+        self.n_vars = (self.env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
+        self.upperbound = upperbound
+        self.lowerbound = lowerbound
+        self.population_size = population_size
 
-
-    # number of weights for multilayer with 10 hidden neurons
-    n_vars = (env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
-
-    # start writing your own code from here
-    # eventjes testen of ik kan pushen
-
-
+    def simulation(self, neuron_values):
+        f, p, e, t = self.env.play(pcont=neuron_values)
+        return f
+    
+    def fitness_eval(self, population):
+        return np.array([simulation(self.env, individual) for individual in population])
+    
+    def train(self):
+        run_mode = 'train'
+        
+        # if no earlier training is done:
+        if not os.path.exists(self.experiment_name+'/evoman_solstate'):
+            print( '\nInitializing training\n')
+            population = np.random.uniform(self.lowerbound,
+                                           self.upperbound,
+                                           (self.population_size, self.n_vars))
+            fitness_population = fitness_eval(population)
+        continue line 186
 
 if __name__ == '__main__':
-    main()
+    
