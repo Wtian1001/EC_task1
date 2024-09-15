@@ -43,7 +43,7 @@ def main():
 
     # number of weights for multilayer with 10 hidden neurons
     n_vars = (env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
-    print(n_vars   )
+    
 
     # start writing your own code from here
 
