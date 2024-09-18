@@ -3,7 +3,7 @@ import numpy as np
 # # dummy values for testing
 # lowerbound = -1
 # upperbound = 1
-# population_size = 100
+# population_size = 200
 # n_vars = 265
 # generation_num=100
 
@@ -15,17 +15,19 @@ import numpy as np
 
 
 def roulette_wheel_selection(population, fitnesses):
-    total_fitness = np.sum(fitnesses)
     selected_individuals = []
     selected_fitness = []
-    
-    for _ in range(population.shape[0]): 
+    n = population.shape[0]
+
+    total_fitness = np.sum(fitnesses)
+
+    for _ in range(n): 
         alpha = np.random.uniform(0, total_fitness)
         cumulative_sum = 0
         j = 0
         
         # selection
-        while cumulative_sum < alpha and j < population.shape[0]:
+        while cumulative_sum < alpha and j < n:
             cumulative_sum += fitnesses[j]
             j += 1
             
@@ -35,75 +37,83 @@ def roulette_wheel_selection(population, fitnesses):
     return np.array(selected_individuals), np.array(selected_fitness)
 
 
+# Does not really work
+# def stochastic_universal_sampling(population, fitnesses):
+#     selected_individuals = []
+#     selected_fitness = []
+#     n = population.shape[0]
 
-def stochastic_universal_sampling(population, fitnesses):
-    mean_fitness = np.mean(fitnesses)
-    alpha = np.random.rand()
-    selected_individuals = []
-    selected_fitness = []
+#     mean_fitness = np.mean(fitnesses)
+#     alpha = np.random.rand()
 
-    cumulative_sum = fitnesses[1]
-    delta = alpha * mean_fitness
-    j = 0
+#     cumulative_sum = fitnesses[0]
+#     delta = alpha * mean_fitness
 
-    while j < population.shape[0] - 1:
-        if delta < cumulative_sum:
-            selected_individuals.append(population[j])
-            selected_fitness.append(fitnesses[j])
-            delta += cumulative_sum
-        else:
-            j += 1
-            cumulative_sum += fitnesses[j]
-    return np.array(selected_individuals), np.array(selected_fitness)
+#     j = 0
+#     while j < n - 1:
+#         if delta < cumulative_sum:
+#             selected_individuals.append(population[j])
+#             selected_fitness.append(fitnesses[j])
+#             delta += cumulative_sum
+#             break
+#         else:
+#             j += 1
+#             cumulative_sum += fitnesses[j] 
+
+#     return np.array(selected_individuals), np.array(selected_fitness)
 
 
 
 
 def linear_rank_selection(population, fitnesses):
+    selected_individuals = []
+    selected_fitness = []
+    n = population.shape[0]
+
     sorted_indices = np.argsort(fitnesses)[::-1]
     ranks = np.zeros_like(sorted_indices)
 
     for rank, index in enumerate(sorted_indices, start=1):
         ranks[index] = rank
 
-    probs = np.zeros(population.shape[0])
-    for i in range(population.shape[0]):
-        probs[i] = ranks[i] / (population.shape[0] * (population.shape[0] - 1))
+    probs = ranks / (n * (n - 1))
 
-    value = 1 / (population.shape[0] - 2.001)
-    selected_individuals = []
-    selected_fitness = []
+    value = 1 / (n - 2.001)
 
-    for i in range(population.shape[0]):
-        alpha = np.random.uniform(0, value)
-        for j in range(population.shape[0]):
-            if probs[j] <= alpha:
-                selected_individuals.append(population[j])
-                selected_fitness.append(fitnesses[j])
-                break
+    while len(selected_individuals) < n:
+        for i in range(n):
+            alpha = np.random.uniform(0, value)
+            for j in range(n):
+                if probs[j] <= alpha:
+                    if len(selected_individuals) < n:
+                        selected_individuals.append(population[j])
+                        selected_fitness.append(fitnesses[j])
+                    break
+    
     return np.array(selected_individuals), np.array(selected_fitness)
 
 
 
 def exponential_rank_selection(population, fitnesses):
+    selected_individuals = []
+    selected_fitness = []
+    n = population.shape[0]
+
     sorted_indices = np.argsort(fitnesses)[::-1]
     ranks = np.zeros_like(sorted_indices)
 
     for rank, index in enumerate(sorted_indices, start=1):
         ranks[index] = rank
 
-    probs = np.zeros(population.shape[0])
-    n = population.shape[0]
+    probs = np.zeros(n)
     c = (n * 2 * (n - 1)) / (6 * (n - 1) + n)
-    for i in range(population.shape[0]):
+    for i in range(n):
         probs[i] = 1.0 * np.exp( - ranks[i] / c)
 
-    selected_individuals = []
-    selected_fitness = []
 
-    for i in range(population.shape[0]):
+    for i in range(n):
         alpha = np.random.uniform(1 / 9 * c, 2 / c)
-        for j in range(population.shape[0]):
+        for j in range(n):
             if probs[j] <= alpha:
                 selected_individuals.append(population[j])
                 selected_fitness.append(fitnesses[j])
@@ -116,20 +126,20 @@ def exponential_rank_selection(population, fitnesses):
 def tournament_selection(population, fitnesses):
     selected_individuals = []
     selected_fitness = []
-    for _ in population: 
-        random_i = np.random.randint(0, population.shape[0])
-        for ind in population:
-            while True:
-                random_i2 = np.random.randint(0, population.shape[0])
-                if random_i != random_i2:
-                    break
-            if fitnesses[random_i] > fitnesses[random_i2]:
-                selected_individuals.append(population[random_i])
-                selected_fitness.append(fitnesses[random_i])
-            else: 
-                selected_individuals.append(population[random_i2])
-                selected_fitness.append(fitnesses[random_i2])
-    
+    n = population.shape[0]
+
+    k = 20
+    for _ in range(n):
+        temp = list(zip(population, fitnesses))
+        np.random.shuffle(temp)
+        res1, res2 = zip(*temp)
+        shuffled_population, shuffled_fitnesses = np.array(res1), np.array(res2)
+
+        # compare k individuals
+        best_out_of_k = np.argmax(shuffled_fitnesses[0:k])
+        selected_individuals.append(shuffled_population[best_out_of_k])
+        selected_fitness.append(shuffled_fitnesses[best_out_of_k])
+
     return np.array(selected_individuals), np.array(selected_fitness)
 
 
@@ -167,8 +177,8 @@ def dynamic_selection(population, fitnesses, generation):
     rws_population, rws_fitness = roulette_wheel_selection(population, fitnesses)
     rws_score = selection_score(rws_population, rws_fitness, generation)
 
-    sus_population, sus_fitness = stochastic_universal_sampling(population, fitnesses)
-    sus_score = selection_score(sus_population, sus_fitness, generation)
+    # sus_population, sus_fitness = stochastic_universal_sampling(population, fitnesses)
+    # sus_score = selection_score(sus_population, sus_fitness, generation)
 
     lrs_population, lrs_fitness = linear_rank_selection(population, fitnesses)
     lrs_score = selection_score(lrs_population, lrs_fitness, generation)
@@ -179,10 +189,11 @@ def dynamic_selection(population, fitnesses, generation):
     tos_population, tos_fitness = tournament_selection(population, fitnesses)
     tos_score = selection_score(tos_population, tos_fitness, generation)
 
-    scores = [rws_score, sus_score, lrs_score, ers_score, tos_score]
-    new_populations = [rws_population, sus_population, lrs_population, ers_population, tos_population]
-    new_fitnesses = [rws_fitness, sus_fitness, lrs_fitness, ers_fitness, tos_fitness]
+    scores = [rws_score, lrs_score, ers_score, tos_score]
+    new_populations = [rws_population, lrs_population, ers_population, tos_population]
+    new_fitnesses = [rws_fitness, lrs_fitness, ers_fitness, tos_fitness]
     best = np.argmax(scores)
+    print(len(new_fitnesses[0]), len(new_fitnesses[1]), len(new_fitnesses[2]), len(new_fitnesses[3]))
 
     # print(scores)
 
@@ -192,6 +203,9 @@ def dynamic_selection(population, fitnesses, generation):
 # leave out truncation selection because it is not often used in practice and only for 
 # very large populations
 
+# for generation in range(1,100):
+#     pop, pop_fit = dynamic_selection(population, fitness_population, generation)
+#     print(generation, np.mean(pop_fit), np.std(pop_fit))
 # print(parent_selection(population, generation_num, fitness_population))
 # print(roulette_wheel_selection(population, fitness_population).shape)
 # dynamic_selection(population, fitness_population, generation_num)
