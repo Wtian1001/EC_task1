@@ -16,6 +16,7 @@ import numpy as np
 from math import fabs,sqrt
 import glob, os
 
+# ATTENTION: To train change headless to true, visuals(within env) to false and run_mode to train
 
 # choose this for not using visuals and thus making experiments faster
 headless = False
