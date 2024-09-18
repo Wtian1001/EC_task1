@@ -138,3 +138,4 @@ def dynamic_selection(population, fitnesses, generation):
 # print(parent_selection(population, generation_num, fitness_population))
 # print(roulette_wheel_selection(population, fitness_population).shape)
 print(dynamic_selection(population, fitness_population, generation_num))
+print(test)
