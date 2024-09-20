@@ -1,16 +1,16 @@
 import numpy as np
 
-# # dummy values for testing
-# lowerbound = -1
-# upperbound = 1
-# population_size = 200
-# n_vars = 265
-# generation_num=100
+# dummy values for testing
+lowerbound = -1
+upperbound = 1
+population_size = 200
+n_vars = 265
+generation_num=100
 
-# # population is (100, 265) with real values ranging from -1 to 1
-# population = np.random.uniform(lowerbound, upperbound, (population_size, n_vars))
-# fitness_population = np.random.uniform(50, 100, population_size)
-# # end dummy values for testing
+# population is (100, 265) with real values ranging from -1 to 1
+population = np.random.uniform(lowerbound, upperbound, (population_size, n_vars))
+fitness_population = np.random.uniform(50, 100, population_size)
+# end dummy values for testing
 
 
 
@@ -193,9 +193,7 @@ def dynamic_selection(population, fitnesses, generation):
     new_populations = [rws_population, lrs_population, ers_population, tos_population]
     new_fitnesses = [rws_fitness, lrs_fitness, ers_fitness, tos_fitness]
     best = np.argmax(scores)
-    print(len(new_fitnesses[0]), len(new_fitnesses[1]), len(new_fitnesses[2]), len(new_fitnesses[3]))
-
-    # print(scores)
+    # print(len(new_fitnesses[0]), len(new_fitnesses[1]), len(new_fitnesses[2]), len(new_fitnesses[3]))
 
     return new_populations[best], new_fitnesses[best]
 
@@ -203,9 +201,11 @@ def dynamic_selection(population, fitnesses, generation):
 # leave out truncation selection because it is not often used in practice and only for 
 # very large populations
 
-# for generation in range(1,100):
-#     pop, pop_fit = dynamic_selection(population, fitness_population, generation)
-#     print(generation, np.mean(pop_fit), np.std(pop_fit))
+for generation in range(1,100):
+    pop, pop_fit = dynamic_selection(population, fitness_population, generation)
+    print(generation, np.mean(pop_fit), np.std(pop_fit))
 # print(parent_selection(population, generation_num, fitness_population))
 # print(roulette_wheel_selection(population, fitness_population).shape)
 # dynamic_selection(population, fitness_population, generation_num)
+
+# print(population[0], population[1])
