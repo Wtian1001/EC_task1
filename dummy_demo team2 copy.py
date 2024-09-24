@@ -6,25 +6,24 @@
 
 # imports framework
 import sys
-
 from evoman.environment import Environment
 from demo_controller import player_controller
 
 # imports other libs
 import time
 import numpy as np
-from math import fabs,sqrt
+from math import fabs, sqrt
 import glob, os
+import itertools
 
 # ATTENTION: To train change headless to true, visuals(within env) to false and run_mode to train job
 
 # choose this for not using visuals and thus making experiments faster
-headless = False
+headless = True
 if headless:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
 
-
-experiment_name = 'team1_test'
+experiment_name = 'team_2_test'
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
@@ -34,41 +33,33 @@ n_hidden_neurons = 10
 
 # initializes simulation in individual evolution mode, for single static enemy.
 env = Environment(experiment_name=experiment_name,
-                  enemies=[1],
+                  enemies=[6],
                   playermode="ai",
                   player_controller=player_controller(n_hidden_neurons),
                   enemymode="static",
                   level=2,
                   speed="fastest",
-                  visuals=True)
-
-# default environment fitness is assumed for experiment
-
-env.state_to_log() # checks environment state
-
-
-####   Optimization for controller solution (best genotype-weights for phenotype-network): Ganetic Algorihm    ###
-
-ini = time.time()  # sets time marker
-
+                  visuals=False)
 
 # genetic algorithm params
+n_vars = (env.get_num_sensors() + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
+run_mode = 'train'
 
-# number of weights for multilayer with 10 hidden neurons
-n_vars = (env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
-
-run_mode = 'test' # train or test
 dom_u = 1
 dom_l = -1
 npop = 100
 gens = 50
-mutation_rate = 0.1
 mutation_weight = 0.1
-n_parents = 3
-k = 3 # Tournament size
+n_parents = 2
+k = 3  # Tournament size
 num_offspring = 50
-last_best = 0
+
+# Island Model parameters
+num_islands = 5  # Number of islands
+migration_interval = 25  # Migrate every 25 generations
+migration_size = 3  # Number of individuals to migrate
+mutation_rate = 0.2
 
 
 # Evaluate fitness
@@ -90,142 +81,141 @@ def tournament_selection(population, fitness_scores, k):
         selected_parents.append(population[winner_index])
     return selected_parents
 
-# Selection
-def select_parents(population, fitness_scores, k=3):
-    selected_parents = tournament_selection(population, fitness_scores, k)
-    return selected_parents
 
-# Multi-parent recombination
+
+def select_parents(population, fitness_scores, k=3):
+    return tournament_selection(population, fitness_scores, k)
+
+# Multi-parent recombination type 2
 def multi_parent_recombination(parents):
     child = np.zeros(n_vars)
     for i in range(n_vars):
-        selected_parent = np.random.choice(range(len(parents)))
-        child[i] = parents[selected_parent][i]
-    
+        child[i] = np.mean([parent[i] for parent in parents])
     return child
+
 
 # Mutation
 def mutate(child, mutation_rate, mutation_weight):
     for i in range(n_vars):
         if np.random.rand() < mutation_rate:
-            child[i] += np.random.uniform((-1 * mutation_weight), mutation_weight)
+            child[i] += np.random.uniform(-mutation_weight, mutation_weight)
     return child
 
 
-
-# Evolution loop
-def evolve_population(population, fitness_scores, num_offspring=50, mutation_rate=0.1, mutation_weight=0.1, k=3, n_parents=2):
-    # Generate offspring using multi-parent recombination and mutation
+# Evolution of a single population (island)
+def evolve_single_population(population, fitness_scores, mutation_rate, num_offspring=50, mutation_weight=0.1, k=3, n_parents=2):
     offspring = []
     selected_parents = select_parents(population, fitness_scores, k)
     for _ in range(num_offspring):
-        # Randomly select n_parents without replacement
         parent_indices = np.random.choice(len(selected_parents), n_parents, replace=False)
-        
-        # Collect the selected parents based on the random indices
         parents = [selected_parents[i] for i in parent_indices]
-
         child = multi_parent_recombination(parents)
         mutated_child = mutate(child, mutation_rate, mutation_weight)
         offspring.append(mutated_child)
-    
-    # Combine population with offspring and re-evaluate
+
     new_population = population + offspring
     new_fitness_scores = evaluate_population(new_population)
-    
-    # Select the top `npop` individuals for the next generation
+
     combined = list(zip(new_population, new_fitness_scores))
-    combined.sort(key=lambda x: x[1], reverse=True)  # Sort by fitness (higher is better)
+    combined.sort(key=lambda x: x[1], reverse=True)
     population = [ind for ind, fitness in combined[:npop]]
     fitness_scores = [fitness for ind, fitness in combined[:npop]]
-    
+
     return population, fitness_scores
 
-# Main loop
+
+# Migration between islands
+def migrate(populations, fitness_scores_list, migration_size):
+    for i in range(num_islands):
+        source_island = i
+        target_island = (i + 1) % num_islands  
+
+        combined = list(zip(populations[source_island], fitness_scores_list[source_island]))
+        combined.sort(key=lambda x: x[1], reverse=True)
+        migrants = [ind for ind, fit in combined[:migration_size]]
+
+        combined_target = list(zip(populations[target_island], fitness_scores_list[target_island]))
+        combined_target.sort(key=lambda x: x[1])  
+        for j in range(migration_size):
+            populations[target_island][j] = migrants[j]
+            fitness_scores_list[target_island][j] = fitness_scores_list[source_island][j]
+
+    return populations, fitness_scores_list
+
+
+# Main loop for training
 if run_mode == 'train':
 
-    # Check if there's an existing saved state
     if not os.path.exists(experiment_name + '/evoman_solstate'):
         print('\nNEW EVOLUTION\n')
 
-        # Generate a new random population
-        population = [np.random.uniform(dom_l, dom_u, n_vars) for _ in range(npop)]
-        fitness_scores = evaluate_population(population)
+        # Initialize populations for each island
+        populations = [
+            [np.random.uniform(dom_l, dom_u, n_vars) for _ in range(npop)]
+            for _ in range(num_islands)
+        ]
 
-        # Find the best individual and population statistics
-        best = np.argmax(fitness_scores)
-        mean = np.mean(fitness_scores)
-        std = np.std(fitness_scores)
-
-        # Set the starting generation to 0
+        # Evaluate fitness for each population
+        fitness_scores_list = [evaluate_population(population) for population in populations]
         ini_g = 0
-
-        # Save the current population and fitness scores
-        solutions = [population, fitness_scores]
-        env.update_solutions(solutions)
 
     else:
         print('\nCONTINUING EVOLUTION\n')
 
-        # Load the saved state from the environment
         env.load_state()
+        populations = env.solutions[0]
+        fitness_scores_list = env.solutions[1]
 
-        # Retrieve the population and fitness scores from the saved state
-        population = env.solutions[0]
-        fitness_scores = env.solutions[1]
-
-        # Find the best individual and population statistics
-        best = np.argmax(fitness_scores)
-        mean = np.mean(fitness_scores)
-        std = np.std(fitness_scores)
-
-        # Load the last generation number from a file
         with open(experiment_name + '/gen.txt', 'r') as file_aux:
             ini_g = int(file_aux.readline().strip())
 
-    # Save results for the first population
-    with open(experiment_name + '/results.txt', 'a') as file_aux:
-        if ini_g == 0:
-            file_aux.write('\n\ngen best mean std')
-
-        print(f'\n GENERATION {ini_g} {round(fitness_scores[best], 6)} {round(mean, 6)} {round(std, 6)}')
-        file_aux.write(f'\n{ini_g} {round(fitness_scores[best], 6)} {round(mean, 6)} {round(std, 6)}')
-
-    # Evolutionary process
-    best_old = 0
     for generation in range(ini_g, gens):
-        print(f"\nEvolving Generation {generation}")
-        population, fitness_scores = evolve_population(population, fitness_scores, num_offspring, mutation_rate, mutation_weight, k, n_parents)
+        print(f"\nGeneration {generation}")
 
-        # Update best, mean, std after evolving
-        best = np.argmax(fitness_scores)
-        mean = np.mean(fitness_scores)
-        std = np.std(fitness_scores)
+        for i in range(num_islands):
+            print(f"  Evolving Island {i + 1}")
+            populations[i], fitness_scores_list[i] = evolve_single_population(
+                populations[i],
+                fitness_scores_list[i],
+                mutation_rate,
+                num_offspring,
+                mutation_weight,
+                k,
+                n_parents
+            )
+
+        if generation % migration_interval == 0:
+            print("  Migration between islands")
+            populations, fitness_scores_list = migrate(populations, fitness_scores_list, migration_size)
+
+        # Collect statistics
+        all_fitness = [fitness for fitness_scores in fitness_scores_list for fitness in fitness_scores]
+        all_individuals = [ind for population in populations for ind in population]
+        best_index = np.argmax(all_fitness)
+        best_fitness = all_fitness[best_index]
+        best_individual = all_individuals[best_index]
+        mean_fitness = np.mean(all_fitness)
+        std_fitness = np.std(all_fitness)
 
         # Save the generation results
         with open(experiment_name + '/results.txt', 'a') as file_aux:
-            print(f' GENERATION {generation} {round(fitness_scores[best], 6)} {round(mean, 6)} {round(std, 6)}')
-            file_aux.write(f'\n{generation} {round(fitness_scores[best], 6)} {round(mean, 6)} {round(std, 6)}')
+            print(f' GENERATION {generation} {round(best_fitness, 6)} {round(mean_fitness, 6)} {round(std_fitness, 6)}')
+            file_aux.write(f'\n{generation} {round(best_fitness, 6)} {round(mean_fitness, 6)} {round(std_fitness, 6)}')
 
         # Save the best individual for this generation
-        best_individual = population[best]
         np.save(f"{experiment_name}/best_individual_gen_{generation}.npy", best_individual)
-        
-        
-        if best_old < fitness_scores[best]:
-            best_old = fitness_scores[best]
+        if best_fitness > fitness_scores_list[0][0]:  # Save if improvement
             np.savetxt(experiment_name + '/best.txt', best_individual)
 
-
-
         # Save the current state
-        solutions = [population, fitness_scores]
+        solutions = [populations, fitness_scores_list]
         env.update_solutions(solutions)
 
-        # Save the generation number
         with open(experiment_name + '/gen.txt', 'w') as file_aux:
             file_aux.write(str(generation))
-# Test Mode: Load and Run the Best Saved Solution
+
+
+# Test the best solution
 elif run_mode == 'test':
     try:
         # Load the best solution from the file
