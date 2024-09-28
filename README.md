@@ -1,3 +1,4 @@
-Evoman is a video game playing framework to be used as a testbed for optimization algorithms.
+## First Performed Evolutionary Algorithm
+-Code in EA1.py
 
-A demo can be found here:  https://www.youtube.com/watch?v=ZqaMjd1E4ZI
+-Data stored in folders EA1_enemy1, EA1_enemy2, EA1_enemy3
