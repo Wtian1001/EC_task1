@@ -21,7 +21,6 @@ import csv
 # Choose the enemy
 enemy = 3
 
-# Choose this for not using visuals and thus making experiments faster
 headless = True
 if headless:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -30,10 +29,9 @@ experiment_name = f'EA1_enemy{enemy}'
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
-# The NN has one hidden layer with 10 neurons
 n_hidden_neurons = 10
 
-# Initializes simulation in individual evolution mode, for single static enemy.
+# initializes simulation in individual evolution mode, for single static enemy.
 env = Environment(experiment_name=experiment_name,
                   enemies=[enemy],
                   playermode="ai",
@@ -43,7 +41,7 @@ env = Environment(experiment_name=experiment_name,
                   speed="fastest",
                   visuals=False)
 
-# Default environment fitness is assumed for experiment
+# default environment fitness is assumed for experiment
 env.state_to_log() # checks environment state
 
 ini = time.time()  # sets time marker
@@ -59,9 +57,6 @@ mutation_rate = 0.1
 
 n_runs = 10
 tournament_size = 5
-
-#def initialize(npop, dom_u, dom_l, n_vars):
-#    return np.random.uniform(dom_u, dom_l, (npop, n_vars))
 
 # runs simulation
 def simulation(env,x):
@@ -142,9 +137,6 @@ def mutation(offspring, mutation_rate, dom_u, dom_l):
             offspring[i] += np.random.normal(0, 1)
             offspring[i] = limits(offspring[i])
     return offspring
-
-
-
 
 
 if __name__ == "__main__": 
